@@ -1,0 +1,83 @@
+clc;
+clear all;
+a1= imread("/MATLAB Drive/Venous Wounds/2_0.jpg");
+figure(1);
+imshow(a1);
+title('original image');
+a= im2bw(a1);
+% Convert Image from RGB Color Space to L*a*b* Color Space
+b1 = rgb2lab(a1);
+figure(2)
+imshow(b1);
+title('L*a*b* color space');
+% Classify the Colors in 'a*b*' Space Using K-Means Clustering
+ab = b1(:,:,2:3);
+ab = im2single(ab);
+nColors = 3;
+% repeat the clustering 3 times to avoid local minima
+pixel_labels = imsegkmeans(ab,nColors,'NumAttempts',3);
+%For every object in your input, imsegkmeans returns an index, or a label, corresponding to a cluster. Label every pixel in the image with its pixel label.
+figure(3);
+imshow(pixel_labels,[])
+title('Image Labeled by Cluster Index');
+%Create Images that Segment the H&E Image by Color
+mask1 = pixel_labels==1;
+cluster1 = a1 .* uint8(mask1);
+figure(4);
+imshow(cluster1)
+title('Objects in Cluster 1');
+mask2 = pixel_labels==2;
+cluster2 = a1 .* uint8(mask2);
+figure(5);
+imshow(cluster2)
+title('Objects in Cluster 2');
+mask3 = pixel_labels==3;
+cluster3 = a1 .* uint8(mask3);
+figure(6);
+imshow(cluster3)
+title('Objects in Cluster 3');
+%segment wound
+L = b1(:,:,1);
+L_blue = L .* double(mask3);
+L_blue = rescale(L_blue);
+idx_light_blue = imbinarize(nonzeros(L_blue));
+blue_idx = find(mask3);
+mask_dark_blue = mask3;
+mask_dark_blue(blue_idx(idx_light_blue)) = 0;
+blue_nuclei = a1 .* uint8(mask_dark_blue);
+figure(7);
+imshow(blue_nuclei);
+title('Blue Wound');
+% convert rgb to grayscale
+G= rgb2gray(blue_nuclei);
+figure(8);
+imshow(G);
+title('Grayscale image wound');
+%binarize the image
+H= imbinarize(G);
+figure(9);
+imshow(H);
+title('Binarized blue nuclei');
+%apply medianfilt
+M= medfilt2(H,[5 5]);
+figure(10);
+imshow(M);
+title('Segmented Image');
+edge_image = edge(M, 'Canny');
+
+% Display the original and edge-detected images
+figure;
+subplot(1,2,1);
+imshow(M);
+title('Segmentation');
+
+subplot(1,2,2);
+imshow(edge_image);
+title('Edge-detected Image');
+if H(25)<10
+ r= bwarea(H)
+end
+% Apply region props
+c4= regionprops('table',M,'Area','Centroid','MajorAxislength','MinorAxislength','Perimeter');
+%label the components
+[L,n] = bwlabel(M,8)
